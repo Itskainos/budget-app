@@ -130,12 +130,22 @@ export function BalanceCard({ totalBalance, pockets }: { totalBalance: number, p
             animate={{ opacity: 1 }}
             className="flex flex-wrap gap-2 mb-8"
           >
-            {pockets.map(pocket => (
-              <div key={pocket.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary/5 border border-secondary/10 rounded-lg">
-                <span className="text-[12px] font-medium text-secondary">{pocket.name}</span>
-                <span className="text-[12px] font-black text-primary">Rs. {pocket.balance.toLocaleString()}</span>
-              </div>
-            ))}
+            {pockets.length === 0 ? (
+              <button 
+                type="button" 
+                onClick={() => setIsEditingPockets(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-teal/10 hover:bg-brand-teal/20 border border-brand-teal/20 rounded-lg text-brand-teal text-[12px] font-bold transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Bank Account
+              </button>
+            ) : (
+              pockets.map(pocket => (
+                <div key={pocket.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary/5 border border-secondary/10 rounded-lg">
+                  <span className="text-[12px] font-medium text-secondary">{pocket.name}</span>
+                  <span className="text-[12px] font-black text-primary">Rs. {pocket.balance.toLocaleString()}</span>
+                </div>
+              ))
+            )}
           </motion.div>
         )}
       </AnimatePresence>

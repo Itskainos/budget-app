@@ -15,7 +15,7 @@ export interface Transaction {
   date: string;
   userId: string;
   userName?: string;
-  type: 'INCOME' | 'EXPENSE';
+  type: 'INCOME' | 'EXPENSE' | 'TRANSFER_IN' | 'TRANSFER_OUT';
 }
 
 // ── Delete-confirmation modal (fixed overlay, never clipped) ──────────────────
