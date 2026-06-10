@@ -199,7 +199,9 @@ export default async function Home({
           <div className="flex flex-col gap-6">
 
             {/* Time Traveling Month Picker */}
-            <MonthPicker month={selectedMonth} year={selectedYear} />
+            <React.Suspense fallback={<div className="h-[60px]" />}>
+              <MonthPicker month={selectedMonth} year={selectedYear} />
+            </React.Suspense>
 
             <section className="flex flex-col gap-4">
               {/* Metric Card (Personal Only) - Cash App Inspired */}
