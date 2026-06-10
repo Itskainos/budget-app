@@ -25,7 +25,8 @@ export default async function Home({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const params = await searchParams;
+  try {
+    const params = await searchParams;
   const showModal = params.modal === "add";
   const showSettingsModal = params.modal === "settings";
   const showSendModal = params.modal === "send";
@@ -302,4 +303,13 @@ export default async function Home({
       )}
     </div>
   );
+  } catch (err: any) {
+    return (
+      <div className="p-8 text-red-500 font-mono">
+        <h1>Server Error</h1>
+        <pre>{err?.message || String(err)}</pre>
+        <pre>{err?.stack}</pre>
+      </div>
+    );
+  }
 }
