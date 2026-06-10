@@ -1,0 +1,79 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id // Maps to Supabase auth.users.id
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+
+  groups   GroupMember[]
+  expenses Expense[]
+  budgets  Budget[]
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  members  GroupMember[]
+  expenses Expense[]
+  budgets  Budget[]
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  groupId   String
+  userId    String
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model Budget {
+  id        String   @id @default(uuid())
+  category  String
+  limit     Float
+  scope     Scope
+  userId    String?
+  groupId   String?
+  createdAt DateTime @default(now())
+
+  user  User?  @relation(fields: [userId], references: [id])
+  group Group? @relation(fields: [groupId], references: [id])
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  amount      Float
+  category    String
+  description String?
+  date        DateTime @default(now())
+  scope       Scope
+  userId      String
+  groupId     String?
+
+  user  User   @relation(fields: [userId], references: [id])
+  group Group? @relation(fields: [groupId], references: [id])
+}
+
+enum Scope {
+  PERSONAL
+  GROUP
+}
