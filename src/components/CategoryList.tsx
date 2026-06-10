@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from "react";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, X, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   CATEGORY_CONFIG,
@@ -28,15 +29,32 @@ export function CategoryList({
 }: {
   categories: CategoryData[];
   activeCategory?: string;
-  activeTab: string;
+  activeTab: "personal" | "family";
 }) {
+  const router = useRouter();
+  const [isPending, startTransition] = React.useTransition();
+  const [pendingCategory, setPendingCategory] = React.useState<string | null>(null);
+
+  const handleCategoryClick = (catName: string, isActive: boolean) => {
+    setPendingCategory(catName);
+    const targetUrl = isActive
+      ? (activeTab === "personal" ? "/?scope=personal" : "/?scope=family")
+      : (activeTab === "personal"
+          ? `/?scope=personal&category=${encodeURIComponent(catName)}`
+          : `/?scope=family&category=${encodeURIComponent(catName)}`);
+    
+    startTransition(() => {
+      router.push(targetUrl, { scroll: false });
+    });
+  };
+
   if (categories.length === 0) {
     return <div className="text-center text-secondary py-12">No transactions yet for this scope. Add one!</div>;
   }
 
   return (
     <div className="w-full pb-24">
-      <div className="bg-surface rounded-3xl shadow-sm border border-[var(--secondary)]/5 overflow-hidden">
+      <div className="flex flex-col gap-3">
         {categories.map((cat, index) => {
           const percent = Math.min(100, (cat.spent / cat.limit) * 100);
           const isWarning = percent >= 80;
@@ -45,64 +63,70 @@ export function CategoryList({
 
           const isActive = activeCategory === cat.name;
           const isDimmed = activeCategory && !isActive;
-
-          // Determine target URL for toggling the category searchParam
-          const href = isActive
-            ? (activeTab === "personal" ? "/?scope=personal" : "/?scope=family")
-            : (activeTab === "personal"
-                ? `/?scope=personal&category=${encodeURIComponent(cat.name)}`
-                : `/?scope=family&category=${encodeURIComponent(cat.name)}`);
+          const activeRingClass = colorClass.replace('bg-', 'ring-');
 
           return (
             <motion.div
               key={cat.id}
               layout
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full"
             >
-              <Link
-                href={href}
-                scroll={false}
-                className={`p-4 flex flex-col gap-1 transition-all duration-200 hover:bg-secondary/5 relative block ${
-                  isActive
-                    ? "bg-brand-teal/5 border-l-4 border-brand-teal shadow-[inset_4px_0_0_0_rgba(13,148,136,0.1)]"
-                    : index !== categories.length - 1
-                    ? "border-b border-background"
-                    : ""
-                } ${isDimmed ? "opacity-40 hover:opacity-70 scale-[0.98]" : ""}`}
+              <button
+                onClick={() => handleCategoryClick(cat.name, isActive)}
+                className={`relative w-full overflow-hidden transition-all duration-300 flex items-center justify-between group rounded-2xl p-4
+                  ${isActive 
+                    ? `bg-surface border-2 shadow-md ${activeRingClass}` 
+                    : isDimmed 
+                    ? 'opacity-40 grayscale-[0.5] hover:opacity-100 hover:grayscale-0 hover:bg-[var(--secondary)]/5 border-2 border-transparent' 
+                    : 'hover:bg-[var(--secondary)]/5 border-2 border-transparent'}`}
+                style={isActive ? { borderColor: colorClass.replace('bg-', 'var(--') + ')' } : {}}
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-all ${
-                    isActive ? "ring-2 ring-brand-teal ring-offset-2 ring-offset-surface" : ""
-                  } ${isWarning ? "bg-brand-coral" : colorClass}`}>
-                    <Icon className="w-5 h-5" />
+                {/* Background tint for active state */}
+                {isActive && (
+                  <div className={`absolute inset-0 opacity-10 ${colorClass}`} />
+                )}
+
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 transition-transform group-hover:scale-110 ${colorClass} text-white shadow-sm`}>
+                    <Icon className="w-5 h-5 stroke-[2.5]" />
                   </div>
-
-                  <span className="font-semibold text-primary text-[15px]">{cat.name}</span>
-
-                  <div className="flex-1 border-b-2 border-dotted border-secondary opacity-20 mx-2 relative top-[2px]"></div>
-
-                  <span className="font-extrabold text-primary text-[15px]">Rs. {cat.spent.toFixed(0)}</span>
                   
-                  {isActive ? (
-                    <div className="p-1 rounded-full bg-brand-teal/10 text-brand-teal hover:bg-brand-teal/20 transition-colors">
-                      <X className="w-3.5 h-3.5" />
+                  <div className="flex flex-col items-start">
+                    <span className="font-bold text-[15px] text-primary transition-colors">
+                      {cat.name}
+                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <div className="w-16 h-1.5 bg-[var(--secondary)]/15 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percent}%` }}
+                          transition={{ duration: 1, type: "spring" }}
+                          className={`h-full rounded-full ${isWarning ? 'bg-brand-coral' : colorClass}`} 
+                        />
+                      </div>
+                      <span className="text-[10px] font-extrabold text-[var(--secondary)] tracking-wider">
+                        {Math.round(percent)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 relative z-10">
+                  <span className={`font-extrabold tracking-tight transition-colors ${isActive ? 'text-primary' : 'text-[var(--secondary)] group-hover:text-primary'}`}>
+                    Rs. {cat.spent.toLocaleString()}
+                  </span>
+                  
+                  {isPending && pendingCategory === cat.name ? (
+                    <Loader2 className="w-4 h-4 text-secondary animate-spin" />
+                  ) : isActive ? (
+                    <div className="w-6 h-6 rounded-full bg-[var(--secondary)]/10 flex items-center justify-center">
+                      <X className="w-3.5 h-3.5 text-primary" />
                     </div>
                   ) : (
-                    <ChevronRight className="w-4 h-4 text-secondary/40 transition-transform group-hover:translate-x-0.5" />
+                    <ChevronRight className="w-4 h-4 text-[var(--secondary)] opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
                   )}
                 </div>
-
-                {/* Progress bar */}
-                <div className="h-[3.5px] w-full bg-background rounded-full overflow-hidden mt-1 ml-14 max-w-[calc(100%-4rem)]">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${percent}%` }}
-                    transition={{ type: 'spring', damping: 20, stiffness: 100 }}
-                    className={`h-full rounded-full ${isWarning ? "bg-brand-coral" : "bg-brand-teal"}`}
-                  />
-                </div>
-              </Link>
+              </button>
             </motion.div>
           );
         })}

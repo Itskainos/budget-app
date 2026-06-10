@@ -6,6 +6,7 @@ import { addTransaction } from '@/app/actions';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
+import { useFormStatus } from 'react-dom';
 
 const CATEGORIES = [
   { name: 'Household & Groceries',  emoji: '🛒' },
@@ -19,6 +20,21 @@ const CATEGORIES = [
   { name: 'Gifts & Donations',       emoji: '🎁' },
   { name: 'Miscellaneous',           emoji: '📦' },
 ];
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button 
+      type="submit" 
+      disabled={pending}
+      className={`w-full text-background font-bold text-lg py-4 rounded-full mt-2 transition-all shadow-md ${
+        pending ? 'bg-secondary opacity-70 cursor-not-allowed' : 'bg-primary hover:opacity-90 active:scale-[0.98] hover:shadow-lg'
+      }`}
+    >
+      {pending ? 'Adding...' : 'Add Expense'}
+    </button>
+  );
+}
 
 export function AddTransactionModal() {
   const [selectedCategory, setSelectedCategory] = React.useState(CATEGORIES[0].name);
@@ -130,9 +146,7 @@ export function AddTransactionModal() {
           {/* Scope is always Family Group */}
           <input type="hidden" name="scope" value="GROUP" />
 
-          <button type="submit" className="w-full bg-primary text-background font-bold text-lg py-4 rounded-full mt-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-md hover:shadow-lg">
-            Add Expense
-          </button>
+          <SubmitButton />
         </form>
       </motion.div>
     </motion.div>
