@@ -1,9 +1,21 @@
 // Shared category config — no 'use client' so it works in Server Components too
-import { ShoppingCart, Zap, BookOpen, Car, ShoppingBag, UtensilsCrossed, HeartPulse, TrendingUp, Gift, Package } from 'lucide-react';
+import { 
+  ShoppingCart, Zap, BookOpen, Car, ShoppingBag, UtensilsCrossed, 
+  HeartPulse, TrendingUp, Gift, Package, 
+  Briefcase, Code, ArrowRightLeft, RotateCcw
+} from 'lucide-react';
 import type { ElementType } from 'react';
 
 export const CATEGORY_CONFIG: Record<string, { icon: ElementType; color: string; hex: string; emoji: string }> = {
-  'Household & Groceries': { icon: ShoppingCart,    color: 'bg-brand-teal',    hex: 'var(--brand-teal)',         emoji: '🛒' },
+  // Income Categories
+  'Salary':                { icon: Briefcase,       color: 'bg-brand-teal',    hex: 'var(--brand-teal)',         emoji: '💰' },
+  'Dev Projects':          { icon: Code,            color: 'bg-brand-teal',    hex: 'var(--brand-teal)',         emoji: '💻' },
+  'Investment Returns':    { icon: TrendingUp,      color: 'bg-brand-teal',    hex: 'var(--brand-teal)',         emoji: '📈' },
+  'Transfer':              { icon: ArrowRightLeft,  color: 'bg-brand-teal',    hex: 'var(--brand-teal)',         emoji: '🔄' },
+  'Refund / Other':        { icon: RotateCcw,       color: 'bg-brand-teal',    hex: 'var(--brand-teal)',         emoji: '💸' },
+  
+  // Expense Categories
+  'Household & Groceries': { icon: ShoppingCart,    color: 'bg-[#0ea5e9]',     hex: '#0ea5e9',                   emoji: '🛒' }, // Changed to blue to avoid conflict with Deep Teal
   'Utilities & Bills':     { icon: Zap,             color: 'bg-[#3b82f6]',     hex: '#3b82f6',                   emoji: '⚡' },
   'Education & Supplies':  { icon: BookOpen,        color: 'bg-[#a855f7]',     hex: '#a855f7',                   emoji: '📚' },
   'Transport & Auto':      { icon: Car,             color: 'bg-[#f59e0b]',     hex: '#f59e0b',                   emoji: '🚗' },

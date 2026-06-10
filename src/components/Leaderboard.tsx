@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Crown, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 
 export interface LeaderboardMember {
   id: string;
@@ -14,9 +15,11 @@ export interface LeaderboardMember {
 export function Leaderboard({
   members,
   totalSpent,
+  activeUser,
 }: {
   members: LeaderboardMember[];
   totalSpent: number;
+  activeUser?: string;
 }) {
   if (members.length === 0) {
     return null;
@@ -48,14 +51,19 @@ export function Leaderboard({
           const percentage = totalSpent > 0 ? (member.totalSpent / totalSpent) * 100 : 0;
           const isWinner = index === 0 && member.totalSpent > 0;
 
+          const isSelected = activeUser === member.id;
+          const href = isSelected ? "?scope=family" : `?scope=family&user=${member.id}`;
+
           return (
-            <motion.div
-              key={member.id}
-              layout
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="flex flex-col gap-1.5"
-            >
-              <div className="flex items-center gap-3">
+            <Link key={member.id} href={href} scroll={false}>
+              <motion.div
+                layout
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className={`flex flex-col gap-1.5 p-2 -mx-2 rounded-2xl transition-colors ${
+                  isSelected ? 'bg-secondary/10 ring-1 ring-secondary/20' : 'hover:bg-secondary/5'
+                }`}
+              >
+                <div className="flex items-center gap-3">
                 {/* Rank number or Gold Crown for #1 */}
                 <div className="w-5 flex items-center justify-center">
                   {isWinner ? (
@@ -101,6 +109,7 @@ export function Leaderboard({
                 />
               </div>
             </motion.div>
+          </Link>
           );
         })}
       </div>

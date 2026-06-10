@@ -9,11 +9,14 @@ import { SettingsModal } from "@/components/SettingsModal";
 import { TransactionList, Transaction } from "@/components/TransactionList";
 import { CalendarView } from "@/components/CalendarView";
 import { Leaderboard, LeaderboardMember } from "@/components/Leaderboard";
-import { X } from "lucide-react";
+import { X, ChevronRight, Pencil } from "lucide-react";
 import { Pool } from 'pg';
 import Link from "next/link";
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
+import { BalanceCard } from "@/components/BalanceCard";
+import { MonthPicker } from "@/components/MonthPicker";
+import { SendMoneyModal } from "@/components/SendMoneyModal";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -25,10 +28,13 @@ export default async function Home({
   const params = await searchParams;
   const showModal = params.modal === "add";
   const showSettingsModal = params.modal === "settings";
+  const showSendModal = params.modal === "send";
   const activeTab = params.scope === "personal" ? "personal" : "family";
   const settingsError = params.error as string | undefined;
   const settingsSuccess = params.success as string | undefined;
   const activeCategory = params.category as string | undefined;
+  const activeUser = params.user as string | undefined;
+  const modalType = (params.type as "INCOME" | "EXPENSE") || "EXPENSE";
 
   // Real Supabase auth
   const supabase = await createClient();
@@ -41,27 +47,33 @@ export default async function Home({
 
   // Get user details from public.User
   const userResult = await pool.query(
-    `SELECT name, "avatarUrl" FROM "User" WHERE id = $1`,
+    `SELECT name, "avatarUrl", "initialBalance", "balanceUpdatedAt", "pockets", "monthlyLimit" FROM "User" WHERE id = $1`,
     [userId]
   );
   const username = userResult.rows[0]?.name || user.email?.split('@')[0] || "User";
   const avatarUrl = userResult.rows[0]?.avatarUrl || null;
+  const initialBalance = userResult.rows[0]?.initialBalance || 0;
+  const balanceUpdatedAt = new Date(userResult.rows[0]?.balanceUpdatedAt || 0);
+  const pockets = userResult.rows[0]?.pockets || [];
+  const monthlyLimit = parseFloat(userResult.rows[0]?.monthlyLimit || 0);
 
   // Fetch expenses based on active tab
   let expResult;
   if (activeTab === "family") {
     // Family Group: all group transactions (all members)
     expResult = await pool.query(
-      `SELECT e.id, e.amount, e.category, e.description, e.date, e."userId"
-       FROM "Expense" e
+      `SELECT e.id, e.amount, e.category, e.description, e.date, e."userId", e.type, u.name as "userName"
+       FROM "Transaction" e
+       LEFT JOIN "User" u ON e."userId" = u.id
        WHERE e.scope = 'GROUP'
        ORDER BY e.date DESC`
     );
   } else {
     // Personal: current user's transactions only (both PERSONAL and GROUP)
     expResult = await pool.query(
-      `SELECT e.id, e.amount, e.category, e.description, e.date, e."userId"
-       FROM "Expense" e
+      `SELECT e.id, e.amount, e.category, e.description, e.date, e."userId", e.type, u.name as "userName"
+       FROM "Transaction" e
+       LEFT JOIN "User" u ON e."userId" = u.id
        WHERE e."userId" = $1
        ORDER BY e.date DESC`,
       [userId]
@@ -69,10 +81,7 @@ export default async function Home({
   }
   const expenses: Transaction[] = expResult.rows;
 
-  // Filter expenses by activeCategory if selected (only affects calendar & list on right)
-  const filteredExpenses = activeCategory
-    ? expenses.filter(e => e.category === activeCategory)
-    : expenses;
+
 
   // Fetch leaderboard data only in family group mode
   let leaderboardMembers: LeaderboardMember[] = [];
@@ -81,7 +90,7 @@ export default async function Home({
     const leaderboardResult = await pool.query(
       `SELECT u.id, u.name, u."avatarUrl", COALESCE(SUM(e.amount), 0)::float as "totalSpent"
        FROM "User" u
-       LEFT JOIN "Expense" e ON u.id = e."userId" AND e.scope = 'GROUP'
+       LEFT JOIN "Transaction" e ON u.id = e."userId" AND e.scope = 'GROUP' AND e.type = 'EXPENSE'
        GROUP BY u.id, u.name, u."avatarUrl"
        ORDER BY "totalSpent" DESC`
     );
@@ -90,13 +99,61 @@ export default async function Home({
   }
 
   // For chart aggregation: show everyone's total in family group, own total in personal
-  const myExpenses = activeTab === "family" ? expenses : expenses.filter(e => e.userId === userId);
+  let myExpenses = activeTab === "family" ? expenses : expenses.filter(e => e.userId === userId);
+  
+  // Filter by activeUser if clicked on leaderboard
+  if (activeTab === "family" && activeUser) {
+    myExpenses = myExpenses.filter(e => e.userId === activeUser);
+  }
 
-  // Aggregate totals by category
-  const categoryTotals = myExpenses.reduce((acc: Record<string, number>, exp) => {
-    acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
-    return acc;
-  }, {} as Record<string, number>);
+  // Fetch all other users for the Send Money modal
+  const otherUsersResult = await pool.query(`SELECT id, name FROM "User" WHERE id != $1`, [userId]);
+  const otherUsers = otherUsersResult.rows;
+
+  // Calculate Ledger Metrics
+  const now = new Date();
+  const selectedMonth = params.month ? parseInt(params.month as string, 10) : now.getMonth();
+  const selectedYear = params.year ? parseInt(params.year as string, 10) : now.getFullYear();
+
+  const isSelectedMonth = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+  };
+
+  const monthlyExpenses = myExpenses.filter(tx => isSelectedMonth(tx.date));
+
+  // Filter expenses by activeCategory if selected (only affects calendar & list on right)
+  const filteredExpenses = activeCategory
+    ? monthlyExpenses.filter(e => e.category === activeCategory)
+    : monthlyExpenses;
+
+  let lifetimeIncome = 0;
+  let lifetimeExpense = 0;
+  let monthlyIncome = 0;
+  let monthlyExpense = 0;
+
+  myExpenses.forEach(tx => {
+    const d = new Date(tx.date);
+    const inSelectedMonth = isSelectedMonth(tx.date);
+
+    if (tx.type === 'INCOME' || tx.type === 'TRANSFER_IN') {
+      if (d >= balanceUpdatedAt) lifetimeIncome += tx.amount;
+      if (inSelectedMonth) monthlyIncome += tx.amount;
+    } else if (tx.type === 'EXPENSE' || tx.type === 'TRANSFER_OUT') {
+      if (d >= balanceUpdatedAt) lifetimeExpense += tx.amount;
+      if (inSelectedMonth) monthlyExpense += tx.amount;
+    }
+  });
+
+  const totalBalance = initialBalance + lifetimeIncome - lifetimeExpense;
+
+  // Aggregate totals by category (EXPENSE ONLY for the Donut Chart)
+  const categoryTotals = monthlyExpenses
+    .filter(exp => exp.type === 'EXPENSE')
+    .reduce((acc: Record<string, number>, exp) => {
+      acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
+      return acc;
+    }, {} as Record<string, number>);
 
   const totalSpent = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
 
@@ -138,18 +195,52 @@ export default async function Home({
 
         {/* Main Desktop Grid */}
         <div className="md:grid md:grid-cols-2 md:gap-12 mt-6 md:mt-10 items-start">
-          {/* Left: Donut + Leaderboard + Categories */}
+          {/* Left: Metrics + Donut + Leaderboard + Categories */}
           <div className="flex flex-col gap-6">
-            <section className="flex justify-center md:sticky md:top-8 z-10">
-              <div className="w-full max-w-md bg-surface p-6 rounded-[2rem] shadow-sm border border-secondary/5">
-                <DonutChart data={donutData} total={totalSpent} />
+
+            {/* Time Traveling Month Picker */}
+            <MonthPicker month={selectedMonth} year={selectedYear} />
+
+            <section className="flex flex-col gap-4">
+              {/* Metric Card (Personal Only) - Cash App Inspired */}
+              {activeTab === "personal" && (
+                <BalanceCard totalBalance={totalBalance} pockets={pockets} />
+              )}
+
+              {/* Donut Chart */}
+              <div className="flex justify-center md:sticky md:top-8 z-10 w-full mt-2">
+                <div className="w-full max-w-md bg-surface p-6 rounded-[2rem] shadow-sm border border-secondary/5">
+                  <DonutChart data={donutData} total={totalSpent} />
+                  
+                  {/* Monthly Budget Progress Bar */}
+                  {monthlyLimit > 0 && activeTab === "personal" && (
+                    <div className="mt-6 pt-6 border-t border-secondary/10">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[12px] font-bold text-secondary uppercase tracking-widest">Monthly Budget</span>
+                        <span className="text-[12px] font-black text-primary">
+                          {Math.round((monthlyExpense / monthlyLimit) * 100)}%
+                        </span>
+                      </div>
+                      <div className="h-2.5 w-full bg-secondary/10 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${monthlyExpense > monthlyLimit ? 'bg-brand-coral' : 'bg-brand-teal'}`}
+                          style={{ width: `${Math.min((monthlyExpense / monthlyLimit) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs font-semibold text-primary">Rs. {monthlyExpense.toLocaleString()}</span>
+                        <span className="text-xs font-semibold text-secondary">of Rs. {monthlyLimit.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
 
             {/* Leaderboard - Only visible in Family Group view */}
             {activeTab === "family" && leaderboardMembers.length > 0 && (
               <section className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <Leaderboard members={leaderboardMembers} totalSpent={groupTotalSpent} />
+                <Leaderboard members={leaderboardMembers} totalSpent={groupTotalSpent} activeUser={activeUser} />
               </section>
             )}
 
@@ -196,11 +287,13 @@ export default async function Home({
 
       <FAB />
       
-      {showModal && <AddTransactionModal />}
+      {showModal && <AddTransactionModal activeTab={activeTab} defaultType={modalType} />}
+      {showSendModal && <SendMoneyModal users={otherUsers} />}
       {showSettingsModal && (
         <SettingsModal 
           username={username} 
           avatarUrl={avatarUrl} 
+          monthlyLimit={monthlyLimit}
           error={settingsError}
           success={settingsSuccess}
         />

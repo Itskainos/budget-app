@@ -39,17 +39,20 @@ function ThemeRow() {
 export function SettingsModal({
   username,
   avatarUrl,
+  monthlyLimit,
   error,
   success,
 }: {
   username: string;
   avatarUrl: string | null;
+  monthlyLimit: number;
   error?: string;
   success?: string;
 }) {
   const [showPassword, setShowPassword] = React.useState(false);
   const [avatarInput, setAvatarInput] = React.useState(avatarUrl || '');
   const [avatarPreview, setAvatarPreview] = React.useState(avatarUrl || '');
+  const [limitInput, setLimitInput] = React.useState(String(monthlyLimit || 0));
 
   return (
     <motion.div
@@ -110,7 +113,7 @@ export function SettingsModal({
             </div>
           </div>
 
-          {/* Avatar URL input */}
+          {/* Profile Form */}
           <form
             action={async (fd) => {
               toast.promise(updateProfile(fd), {
@@ -119,26 +122,43 @@ export function SettingsModal({
                 error: 'Failed to update profile.',
               });
             }}
-            className="flex flex-col gap-2"
+            className="flex flex-col gap-4"
           >
-            <label className="block text-[11px] font-bold tracking-widest uppercase text-secondary ml-1">Profile Picture URL</label>
-            <div className="flex gap-2">
-              <input
-                name="avatarUrl"
-                type="url"
-                value={avatarInput}
-                onChange={(e) => {
-                  setAvatarInput(e.target.value);
-                  setAvatarPreview(e.target.value);
-                }}
-                placeholder="https://..."
-                className="flex-1 bg-background border border-secondary/10 rounded-2xl px-4 py-3 text-primary text-sm focus:outline-none focus:border-brand-teal transition-colors"
-              />
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="block text-[11px] font-bold tracking-widest uppercase text-secondary ml-1">Profile Picture URL</label>
+                <input
+                  name="avatarUrl"
+                  type="url"
+                  value={avatarInput}
+                  onChange={(e) => {
+                    setAvatarInput(e.target.value);
+                    setAvatarPreview(e.target.value);
+                  }}
+                  placeholder="https://..."
+                  className="w-full bg-background border border-secondary/10 rounded-2xl px-4 py-3 text-primary text-sm focus:outline-none focus:border-brand-teal transition-colors"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="block text-[11px] font-bold tracking-widest uppercase text-secondary ml-1">Monthly Spending Budget</label>
+                <div className="flex gap-2">
+                  <span className="flex items-center justify-center bg-secondary/10 px-4 rounded-2xl font-bold text-primary">Rs.</span>
+                  <input
+                    name="monthlyLimit"
+                    type="number"
+                    step="any"
+                    value={limitInput}
+                    onChange={(e) => setLimitInput(e.target.value)}
+                    placeholder="0"
+                    className="w-full bg-background border border-secondary/10 rounded-2xl px-4 py-3 text-primary text-sm focus:outline-none focus:border-brand-teal transition-colors"
+                  />
+                </div>
+              </div>
               <button
                 type="submit"
-                className="bg-brand-teal text-white font-bold px-4 rounded-2xl hover:opacity-90 transition-opacity text-sm shrink-0"
+                className="w-full mt-2 bg-brand-teal text-white font-bold px-4 py-3 rounded-2xl hover:opacity-90 transition-opacity text-sm"
               >
-                Save
+                Save Profile
               </button>
             </div>
           </form>

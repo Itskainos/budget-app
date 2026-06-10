@@ -14,6 +14,8 @@ export interface Transaction {
   description: string | null;
   date: string;
   userId: string;
+  userName?: string;
+  type: 'INCOME' | 'EXPENSE';
 }
 
 // ── Delete-confirmation modal (fixed overlay, never clipped) ──────────────────
@@ -164,14 +166,14 @@ export function TransactionList({
                     <p className="text-secondary text-[11px] font-medium">
                       {tx.category} · {dateStr}
                       {!isOwn && (
-                        <span className="ml-1.5 text-brand-teal font-bold">· Family</span>
+                        <span className="ml-1.5 text-brand-teal font-bold">· {tx.userName?.split(' ')[0] || 'Family'}</span>
                       )}
                     </p>
                   </div>
 
                   {/* Amount */}
-                  <span className="font-extrabold text-primary text-sm shrink-0">
-                    Rs. {tx.amount.toLocaleString()}
+                  <span className={`font-extrabold text-sm shrink-0 ${tx.type === 'INCOME' ? 'text-brand-teal' : 'text-primary'}`}>
+                    {tx.type === 'INCOME' ? '+' : '-'} Rs. {tx.amount.toLocaleString()}
                   </span>
 
                   {/* Delete — only for own transactions */}

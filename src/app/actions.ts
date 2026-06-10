@@ -19,14 +19,59 @@ export async function addTransaction(formData: FormData) {
   const category = formData.get('category') as string
   const description = formData.get('description') as string
   const scope = formData.get('scope') as 'PERSONAL' | 'GROUP'
+  const type = formData.get('type') as 'INCOME' | 'EXPENSE' || 'EXPENSE'
 
   try {
     await pool.query(
-      `INSERT INTO "Expense" (id, amount, category, description, scope, "userId", date) VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW())`,
-      [amount, category, description, scope, user.id]
+      `INSERT INTO "Transaction" (id, amount, category, description, scope, type, "userId", date) VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, NOW())`,
+      [amount, category, description, scope, type, user.id]
     )
   } catch (error) {
     console.error('Failed to create transaction', error)
+  }
+
+  revalidatePath('/')
+  redirect('/')
+}
+
+export async function sendMoney(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const amount = parseFloat(formData.get('amount') as string)
+  const recipientId = formData.get('recipientId') as string
+  const description = formData.get('description') as string || 'Transfer'
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Sender -> TRANSFER_OUT
+      await client.query(
+        `INSERT INTO "Transaction" (id, amount, category, description, scope, type, "userId", date) VALUES (gen_random_uuid()::text, $1, 'Transfer', $2, 'GROUP', 'TRANSFER_OUT', $3, NOW())`,
+        [amount, description, user.id]
+      )
+      
+      // Recipient -> TRANSFER_IN
+      await client.query(
+        `INSERT INTO "Transaction" (id, amount, category, description, scope, type, "userId", date) VALUES (gen_random_uuid()::text, $1, 'Transfer', $2, 'GROUP', 'TRANSFER_IN', $3, NOW())`,
+        [amount, description, recipientId]
+      )
+      
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Failed to send money', error)
   }
 
   revalidatePath('/')
@@ -45,7 +90,7 @@ export async function deleteTransaction(formData: FormData) {
 
   // Only delete if the expense belongs to the current user (security check)
   await pool.query(
-    `DELETE FROM "Expense" WHERE id = $1 AND "userId" = $2`,
+    `DELETE FROM "Transaction" WHERE id = $1 AND "userId" = $2`,
     [id, user.id]
   )
 
@@ -66,11 +111,39 @@ export async function updateProfile(formData: FormData) {
     redirect('/login')
   }
 
-  const avatarUrl = formData.get('avatarUrl') as string
+  const avatarUrl = formData.get('avatarUrl') as string;
+  const rawLimit = formData.get('monthlyLimit');
+  const monthlyLimit = rawLimit ? parseFloat(rawLimit as string) : 0;
 
   await pool.query(
-    `UPDATE "User" SET "avatarUrl" = $1 WHERE id = $2`,
-    [avatarUrl, user.id]
+    `UPDATE "User" SET "avatarUrl" = $1, "monthlyLimit" = $2 WHERE id = $3`,
+    [avatarUrl, monthlyLimit, user.id]
+  )
+
+  revalidatePath('/')
+}
+
+export async function updatePockets(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const rawPockets = formData.get('pockets') as string;
+  let pockets: { id: string, name: string, balance: number }[] = [];
+  try {
+    pockets = JSON.parse(rawPockets);
+  } catch (e) {
+    // invalid JSON
+  }
+
+  const totalBalance = pockets.reduce((sum, p) => sum + p.balance, 0);
+
+  await pool.query(
+    `UPDATE "User" SET "pockets" = $1::jsonb, "initialBalance" = $2, "balanceUpdatedAt" = NOW() WHERE id = $3`,
+    [JSON.stringify(pockets), totalBalance, user.id]
   )
 
   revalidatePath('/')
