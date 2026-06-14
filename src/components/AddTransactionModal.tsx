@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { useFormStatus } from 'react-dom';
 
 const EXPENSE_CATEGORIES = [
+  { name: 'EMI & Loans',             emoji: '💳' },
   { name: 'Household & Groceries',  emoji: '🛒' },
   { name: 'Utilities & Bills',       emoji: '⚡' },
   { name: 'Education & Supplies',    emoji: '📚' },

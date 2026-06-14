@@ -46,11 +46,21 @@ export default async function Home({
 
   const userId = user.id;
 
-  // Get user details from public.User
-  const userResult = await pool.query(
-    `SELECT name, "avatarUrl", "initialBalance", "balanceUpdatedAt", "pockets", "monthlyLimit" FROM "User" WHERE id = $1`,
-    [userId]
-  );
+  const [userResult, expResult, leaderboardResult, otherUsersResult] = await Promise.all([
+    // Get user details
+    pool.query(`SELECT name, "avatarUrl", "initialBalance", "balanceUpdatedAt", "pockets", "monthlyLimit" FROM "User" WHERE id = $1`, [userId]),
+    // Fetch expenses based on active tab
+    activeTab === "family"
+      ? pool.query(`SELECT e.id, e.amount, e.category, e.description, e.date, e."userId", e.type, u.name as "userName" FROM "Transaction" e LEFT JOIN "User" u ON e."userId" = u.id WHERE e.scope = 'GROUP' ORDER BY e.date DESC`)
+      : pool.query(`SELECT e.id, e.amount, e.category, e.description, e.date, e."userId", e.type, u.name as "userName" FROM "Transaction" e LEFT JOIN "User" u ON e."userId" = u.id WHERE e."userId" = $1 ORDER BY e.date DESC`, [userId]),
+    // Fetch leaderboard data only in family group mode
+    activeTab === "family"
+      ? pool.query(`SELECT u.id, u.name, u."avatarUrl", COALESCE(SUM(e.amount), 0)::float as "totalSpent" FROM "User" u LEFT JOIN "Transaction" e ON u.id = e."userId" AND e.scope = 'GROUP' AND e.type = 'EXPENSE' GROUP BY u.id, u.name, u."avatarUrl" ORDER BY "totalSpent" DESC`)
+      : Promise.resolve({ rows: [] }),
+    // Fetch all other users for the Send Money modal
+    pool.query(`SELECT id, name FROM "User" WHERE id != $1`, [userId])
+  ]);
+
   const username = userResult.rows[0]?.name || user.email?.split('@')[0] || "User";
   const avatarUrl = userResult.rows[0]?.avatarUrl || null;
   const initialBalance = userResult.rows[0]?.initialBalance || 0;
@@ -58,46 +68,10 @@ export default async function Home({
   const pockets = userResult.rows[0]?.pockets || [];
   const monthlyLimit = parseFloat(userResult.rows[0]?.monthlyLimit || 0);
 
-  // Fetch expenses based on active tab
-  let expResult;
-  if (activeTab === "family") {
-    // Family Group: all group transactions (all members)
-    expResult = await pool.query(
-      `SELECT e.id, e.amount, e.category, e.description, e.date, e."userId", e.type, u.name as "userName"
-       FROM "Transaction" e
-       LEFT JOIN "User" u ON e."userId" = u.id
-       WHERE e.scope = 'GROUP'
-       ORDER BY e.date DESC`
-    );
-  } else {
-    // Personal: current user's transactions only (both PERSONAL and GROUP)
-    expResult = await pool.query(
-      `SELECT e.id, e.amount, e.category, e.description, e.date, e."userId", e.type, u.name as "userName"
-       FROM "Transaction" e
-       LEFT JOIN "User" u ON e."userId" = u.id
-       WHERE e."userId" = $1
-       ORDER BY e.date DESC`,
-      [userId]
-    );
-  }
   const expenses: Transaction[] = expResult.rows;
 
-
-
-  // Fetch leaderboard data only in family group mode
-  let leaderboardMembers: LeaderboardMember[] = [];
-  let groupTotalSpent = 0;
-  if (activeTab === "family") {
-    const leaderboardResult = await pool.query(
-      `SELECT u.id, u.name, u."avatarUrl", COALESCE(SUM(e.amount), 0)::float as "totalSpent"
-       FROM "User" u
-       LEFT JOIN "Transaction" e ON u.id = e."userId" AND e.scope = 'GROUP' AND e.type = 'EXPENSE'
-       GROUP BY u.id, u.name, u."avatarUrl"
-       ORDER BY "totalSpent" DESC`
-    );
-    leaderboardMembers = leaderboardResult.rows;
-    groupTotalSpent = leaderboardMembers.reduce((sum, m) => sum + m.totalSpent, 0);
-  }
+  const leaderboardMembers: LeaderboardMember[] = leaderboardResult.rows;
+  const groupTotalSpent = activeTab === "family" ? leaderboardMembers.reduce((sum, m) => sum + m.totalSpent, 0) : 0;
 
   // For chart aggregation: show everyone's total in family group, own total in personal
   let myExpenses = activeTab === "family" ? expenses : expenses.filter(e => e.userId === userId);
@@ -107,8 +81,6 @@ export default async function Home({
     myExpenses = myExpenses.filter(e => e.userId === activeUser);
   }
 
-  // Fetch all other users for the Send Money modal
-  const otherUsersResult = await pool.query(`SELECT id, name FROM "User" WHERE id != $1`, [userId]);
   const otherUsers = otherUsersResult.rows;
 
   // Calculate Ledger Metrics
@@ -168,7 +140,6 @@ export default async function Home({
     id: String(idx),
     name,
     spent,
-    limit: 50000
   })).sort((a, b) => b.spent - a.spent);
 
   return (
@@ -243,7 +214,13 @@ export default async function Home({
             {/* Leaderboard - Only visible in Family Group view */}
             {activeTab === "family" && leaderboardMembers.length > 0 && (
               <section className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <Leaderboard members={leaderboardMembers} totalSpent={groupTotalSpent} activeUser={activeUser} />
+                <Leaderboard 
+                  members={leaderboardMembers} 
+                  totalSpent={groupTotalSpent} 
+                  activeUser={activeUser}
+                  transactions={monthlyExpenses}
+                  currentUserId={userId}
+                />
               </section>
             )}
 
@@ -255,6 +232,8 @@ export default async function Home({
                 categories={categoryListData} 
                 activeCategory={activeCategory} 
                 activeTab={activeTab} 
+                transactions={monthlyExpenses}
+                currentUserId={userId}
               />
             </section>
           </div>

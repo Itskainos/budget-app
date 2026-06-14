@@ -177,3 +177,34 @@ export async function updatePassword(formData: FormData) {
   revalidatePath('/')
   redirect('/?modal=settings&success=Password+updated+successfully')
 }
+
+export async function updateCategoryBudget(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const category = formData.get('category') as string
+  const limit = parseFloat(formData.get('limit') as string) || 0
+  const scope = formData.get('scope') as 'PERSONAL' | 'GROUP'
+
+  if (limit > 0) {
+    await pool.query(
+      `DELETE FROM "Budget" WHERE category = $1 AND scope = $2 AND "userId" = $3`,
+      [category, scope, user.id]
+    )
+    await pool.query(
+      `INSERT INTO "Budget" (id, category, "limit", scope, "userId", "createdAt") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW())`,
+      [category, limit, scope, user.id]
+    )
+  } else {
+    await pool.query(
+      `DELETE FROM "Budget" WHERE category = $1 AND scope = $2 AND "userId" = $3`,
+      [category, scope, user.id]
+    )
+  }
+
+  revalidatePath('/')
+}

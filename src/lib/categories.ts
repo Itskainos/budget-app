@@ -15,6 +15,7 @@ export const CATEGORY_CONFIG: Record<string, { icon: ElementType; color: string;
   'Refund / Other':        { icon: RotateCcw,       color: 'bg-brand-teal',    hex: 'var(--brand-teal)',         emoji: '💸' },
   
   // Expense Categories
+  'EMI & Loans':           { icon: Briefcase,       color: 'bg-[#ef4444]',     hex: '#ef4444',                   emoji: '💳' },
   'Household & Groceries': { icon: ShoppingCart,    color: 'bg-[#0ea5e9]',     hex: '#0ea5e9',                   emoji: '🛒' }, // Changed to blue to avoid conflict with Deep Teal
   'Utilities & Bills':     { icon: Zap,             color: 'bg-[#3b82f6]',     hex: '#3b82f6',                   emoji: '⚡' },
   'Education & Supplies':  { icon: BookOpen,        color: 'bg-[#a855f7]',     hex: '#a855f7',                   emoji: '📚' },

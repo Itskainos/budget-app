@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Trash2 } from 'lucide-react';
 import { deleteTransaction } from '@/app/actions';
-import { CATEGORY_CONFIG } from './CategoryList';
+import { CATEGORY_CONFIG } from '@/lib/categories';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -172,12 +172,12 @@ export function TransactionList({
                   </div>
 
                   {/* Amount */}
-                  <span className={`font-extrabold text-sm shrink-0 ${tx.type === 'INCOME' ? 'text-brand-teal' : 'text-primary'}`}>
-                    {tx.type === 'INCOME' ? '+' : '-'} Rs. {tx.amount.toLocaleString()}
+                  <span className={`font-extrabold text-sm shrink-0 ${(tx.type === 'INCOME' || tx.type === 'TRANSFER_IN') ? 'text-brand-teal' : 'text-primary'}`}>
+                    {(tx.type === 'INCOME' || tx.type === 'TRANSFER_IN') ? '+' : '-'} Rs. {tx.amount.toLocaleString()}
                   </span>
 
-                  {/* Delete — only for own transactions */}
-                  {isOwn && (
+                  {/* Delete — only for own transactions and not transfers */}
+                  {isOwn && tx.type !== 'TRANSFER_IN' && tx.type !== 'TRANSFER_OUT' && (
                     <button
                       type="button"
                       title="Delete transaction"

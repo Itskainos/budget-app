@@ -42,6 +42,8 @@ export function SettingsModal({
   monthlyLimit,
   error,
   success,
+  budgetLimits,
+  scope,
 }: {
   username: string;
   avatarUrl: string | null;

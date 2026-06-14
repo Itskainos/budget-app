@@ -65,7 +65,7 @@ export function CalendarView({
   const selectedTxs = selectedDay ? (txByDay[selectedDay] ?? []) : transactions;
   const selectedLabel = selectedDay
     ? new Date(selectedDay + 'T00:00:00').toLocaleDateString('en-NP', { weekday: 'long', day: 'numeric', month: 'long' })
-    : 'All Transactions';
+    : `${monthLabel} (Whole Month)`;
 
   // Build grid cells: nulls for empty leading cells, then day numbers
   const cells: (number | null)[] = [
@@ -80,7 +80,12 @@ export function CalendarView({
         <button onClick={prevMonth} className="text-secondary hover:text-primary transition-colors p-1">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <span className="text-sm font-extrabold text-primary">{monthLabel}</span>
+        <button 
+          onClick={() => setSelectedDay(null)}
+          className={`text-sm font-extrabold transition-colors px-4 py-1.5 rounded-full ${!selectedDay ? 'bg-brand-teal text-white shadow-md shadow-brand-teal/20' : 'text-primary hover:bg-secondary/10'}`}
+        >
+          {monthLabel}
+        </button>
         <button onClick={nextMonth} className="text-secondary hover:text-primary transition-colors p-1">
           <ChevronRight className="w-5 h-5" />
         </button>

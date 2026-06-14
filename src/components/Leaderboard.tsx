@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import { Crown, Trophy } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { TransactionList, Transaction } from './TransactionList';
 
 export interface LeaderboardMember {
   id: string;
@@ -16,10 +17,14 @@ export function Leaderboard({
   members,
   totalSpent,
   activeUser,
+  transactions,
+  currentUserId,
 }: {
   members: LeaderboardMember[];
   totalSpent: number;
   activeUser?: string;
+  transactions: Transaction[];
+  currentUserId: string;
 }) {
   if (members.length === 0) {
     return null;
@@ -55,14 +60,15 @@ export function Leaderboard({
           const href = isSelected ? "?scope=family" : `?scope=family&user=${member.id}`;
 
           return (
-            <Link key={member.id} href={href} scroll={false}>
-              <motion.div
-                layout
-                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className={`flex flex-col gap-1.5 p-2 -mx-2 rounded-2xl transition-colors ${
-                  isSelected ? 'bg-secondary/10 ring-1 ring-secondary/20' : 'hover:bg-secondary/5'
-                }`}
-              >
+            <motion.div key={member.id} layout className="flex flex-col">
+              <Link href={href} scroll={false}>
+                <motion.div
+                  layout
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className={`flex flex-col gap-1.5 p-2 -mx-2 rounded-2xl transition-colors ${
+                    isSelected ? 'bg-secondary/10 ring-1 ring-secondary/20' : 'hover:bg-secondary/5'
+                  }`}
+                >
                 <div className="flex items-center gap-3">
                 {/* Rank number or Gold Crown for #1 */}
                 <div className="w-5 flex items-center justify-center">
@@ -108,8 +114,29 @@ export function Leaderboard({
                   }`}
                 />
               </div>
+                </motion.div>
+              </Link>
+              
+              {/* Transaction Dropdown */}
+              <AnimatePresence initial={false}>
+                {isSelected && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-2 pb-4">
+                      <TransactionList 
+                        transactions={transactions.filter(t => t.userId === member.id)} 
+                        currentUserId={currentUserId} 
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
-          </Link>
           );
         })}
       </div>

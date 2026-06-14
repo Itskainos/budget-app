@@ -4,7 +4,8 @@ import * as React from "react";
 import { ChevronRight, X, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { TransactionList, Transaction } from "./TransactionList";
 import {
   CATEGORY_CONFIG,
   getIconForCategory,
@@ -19,17 +20,20 @@ export interface CategoryData {
   id: string;
   name: string;
   spent: number;
-  limit: number;
 }
 
 export function CategoryList({
   categories,
   activeCategory,
   activeTab,
+  transactions,
+  currentUserId,
 }: {
   categories: CategoryData[];
   activeCategory?: string;
   activeTab: "personal" | "family";
+  transactions: Transaction[];
+  currentUserId: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = React.useTransition();
@@ -55,9 +59,7 @@ export function CategoryList({
   return (
     <div className="w-full pb-24">
       <div className="flex flex-col gap-3">
-        {categories.map((cat, index) => {
-          const percent = Math.min(100, (cat.spent / cat.limit) * 100);
-          const isWarning = percent >= 80;
+        {categories.map((cat) => {
           const Icon = getIconForCategory(cat.name);
           const colorClass = getColorForCategory(cat.name);
 
@@ -95,19 +97,6 @@ export function CategoryList({
                     <span className="font-bold text-[15px] text-primary transition-colors">
                       {cat.name}
                     </span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <div className="w-16 h-1.5 bg-[var(--secondary)]/15 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${percent}%` }}
-                          transition={{ duration: 1, type: "spring" }}
-                          className={`h-full rounded-full ${isWarning ? 'bg-brand-coral' : colorClass}`} 
-                        />
-                      </div>
-                      <span className="text-[10px] font-extrabold text-[var(--secondary)] tracking-wider">
-                        {Math.round(percent)}%
-                      </span>
-                    </div>
                   </div>
                 </div>
 
@@ -127,6 +116,26 @@ export function CategoryList({
                   )}
                 </div>
               </button>
+
+              {/* Transaction Dropdown */}
+              <AnimatePresence initial={false}>
+                {isActive && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-2 px-2 pb-4">
+                      <TransactionList 
+                        transactions={transactions.filter(t => t.category === cat.name)} 
+                        currentUserId={currentUserId} 
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           );
         })}
