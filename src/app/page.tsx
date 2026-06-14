@@ -2,7 +2,7 @@ import * as React from "react";
 import { PillToggle } from "@/components/PillToggle";
 import { DonutChart } from "@/components/DonutChart";
 import { CategoryList, CategoryData } from "@/components/CategoryList";
-import { getHexColorForCategory } from "@/lib/categories";
+import { getHexColorForCategory, CATEGORY_CONFIG } from "@/lib/categories";
 import { FAB } from "@/components/FAB";
 import { AddTransactionModal } from "@/components/AddTransactionModal";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -121,12 +121,19 @@ export default async function Home({
   const totalBalance = initialBalance + lifetimeIncome - lifetimeExpense;
 
   // Aggregate totals by category (EXPENSE ONLY for the Donut Chart)
+  const INCOME_KEYS = ['Salary', 'Dev Projects', 'Investment Returns', 'Transfer', 'Refund / Other'];
+  const EXPENSE_KEYS = Object.keys(CATEGORY_CONFIG).filter(k => !INCOME_KEYS.includes(k));
+  const initialTotals = EXPENSE_KEYS.reduce((acc, key) => {
+    acc[key] = 0;
+    return acc;
+  }, {} as Record<string, number>);
+
   const categoryTotals = monthlyExpenses
     .filter(exp => exp.type === 'EXPENSE')
     .reduce((acc: Record<string, number>, exp) => {
       acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
       return acc;
-    }, {} as Record<string, number>);
+    }, initialTotals);
 
   const totalSpent = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
 
