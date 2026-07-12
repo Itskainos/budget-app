@@ -19,12 +19,16 @@ export function Leaderboard({
   activeUser,
   transactions,
   currentUserId,
+  month,
+  year,
 }: {
   members: LeaderboardMember[];
   totalSpent: number;
   activeUser?: string;
   transactions: Transaction[];
   currentUserId: string;
+  month: number;   // 0-indexed JS month
+  year: number;
 }) {
   if (members.length === 0) {
     return null;
@@ -33,6 +37,9 @@ export function Leaderboard({
   // Filter out any members who have 0 spent if desired, or show everyone. Showing everyone is cleaner.
   // The members list is already sorted by totalSpent DESC in SQL, but we can double check or sort here.
   const sortedMembers = [...members].sort((a, b) => b.totalSpent - a.totalSpent);
+
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const monthLabel = `${MONTH_NAMES[month]} ${year}`;
 
   return (
     <div className="w-full bg-surface p-6 rounded-[2rem] shadow-sm border border-secondary/5 relative overflow-hidden">
@@ -46,7 +53,7 @@ export function Leaderboard({
         </div>
         <div>
           <h3 className="font-extrabold text-primary text-sm tracking-wide uppercase">Leaderboard</h3>
-          <p className="text-[10px] text-secondary font-medium uppercase tracking-widest mt-0.5">Whos spent what</p>
+          <p className="text-[10px] text-secondary font-medium uppercase tracking-widest mt-0.5">Who spent what · {monthLabel}</p>
         </div>
       </div>
 

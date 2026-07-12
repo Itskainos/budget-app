@@ -15,17 +15,47 @@ export async function addTransaction(formData: FormData) {
     redirect('/login')
   }
 
-  const amount = parseFloat(formData.get('amount') as string)
-  const category = formData.get('category') as string
-  const description = formData.get('description') as string
-  const scope = formData.get('scope') as 'PERSONAL' | 'GROUP'
-  const type = formData.get('type') as 'INCOME' | 'EXPENSE' || 'EXPENSE'
+  const amount       = parseFloat(formData.get('amount') as string)
+  const category     = formData.get('category') as string
+  const description  = formData.get('description') as string
+  const scope        = formData.get('scope') as 'PERSONAL' | 'GROUP'
+  const type         = (formData.get('type') as 'INCOME' | 'EXPENSE') || 'EXPENSE'
+  const dateStr      = formData.get('date') as string | null
+  const isRecurring  = formData.get('isRecurring') === 'true'
+  const totalMonths  = parseInt((formData.get('totalMonths') as string) || '1', 10)
+
+  // Use picked date at noon UTC to avoid timezone date-boundary issues.
+  // Falls back to the current moment if no date supplied.
+  const txDate = dateStr
+    ? new Date(`${dateStr}T12:00:00.000Z`)
+    : new Date()
 
   try {
-    await pool.query(
-      `INSERT INTO "Transaction" (id, amount, category, description, scope, type, "userId", date) VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, NOW())`,
-      [amount, category, description, scope, type, user.id]
-    )
+    if (isRecurring && type === 'EXPENSE') {
+      // 1. Insert the EMI definition
+      const emiResult = await pool.query(
+        `INSERT INTO "Emi" (id, "userId", description, amount, category, scope, "startMonth", "startYear", "totalMonths")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id`,
+        [user.id, description, amount, category, scope,
+         txDate.getUTCMonth(), txDate.getUTCFullYear(), totalMonths]
+      )
+      const emiId = emiResult.rows[0].id
+
+      // 2. Insert the first month's transaction linked to this EMI
+      await pool.query(
+        `INSERT INTO "Transaction" (id, amount, category, description, scope, type, "userId", date, "emiId")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8)`,
+        [amount, category, description, scope, type, user.id, txDate.toISOString(), emiId]
+      )
+    } else {
+      // One-time transaction
+      await pool.query(
+        `INSERT INTO "Transaction" (id, amount, category, description, scope, type, "userId", date)
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7)`,
+        [amount, category, description, scope, type, user.id, txDate.toISOString()]
+      )
+    }
   } catch (error) {
     console.error('Failed to create transaction', error)
   }
@@ -92,6 +122,25 @@ export async function deleteTransaction(formData: FormData) {
   await pool.query(
     `DELETE FROM "Transaction" WHERE id = $1 AND "userId" = $2`,
     [id, user.id]
+  )
+
+  revalidatePath('/')
+}
+
+export async function deleteEmi(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const emiId = formData.get('emiId') as string
+
+  // Only delete if owned by this user (security check)
+  await pool.query(
+    `DELETE FROM "Emi" WHERE id = $1 AND "userId" = $2`,
+    [emiId, user.id]
   )
 
   revalidatePath('/')

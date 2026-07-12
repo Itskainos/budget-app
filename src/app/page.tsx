@@ -17,6 +17,7 @@ import { createClient } from '@/utils/supabase/server';
 import { BalanceCard } from "@/components/BalanceCard";
 import { MonthPicker } from "@/components/MonthPicker";
 import { SendMoneyModal } from "@/components/SendMoneyModal";
+import { ensureEmiTransactions } from '@/lib/emi';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -46,6 +47,14 @@ export default async function Home({
 
   const userId = user.id;
 
+  // Auto-insert EMI transactions for the current month (silent if Emi table doesn't exist yet)
+  await ensureEmiTransactions(userId);
+
+  // selectedMonth/Year must be derived before the leaderboard query uses them
+  const now = new Date();
+  const selectedMonth = params.month ? parseInt(params.month as string, 10) : now.getMonth();
+  const selectedYear  = params.year  ? parseInt(params.year  as string, 10) : now.getFullYear();
+
   const [userResult, expResult, leaderboardResult, otherUsersResult] = await Promise.all([
     // Get user details
     pool.query(`SELECT name, "avatarUrl", "initialBalance", "balanceUpdatedAt", "pockets", "monthlyLimit" FROM "User" WHERE id = $1`, [userId]),
@@ -53,9 +62,22 @@ export default async function Home({
     activeTab === "family"
       ? pool.query(`SELECT e.id, e.amount, e.category, e.description, e.date, e."userId", e.type, u.name as "userName" FROM "Transaction" e LEFT JOIN "User" u ON e."userId" = u.id WHERE e.scope = 'GROUP' ORDER BY e.date DESC`)
       : pool.query(`SELECT e.id, e.amount, e.category, e.description, e.date, e."userId", e.type, u.name as "userName" FROM "Transaction" e LEFT JOIN "User" u ON e."userId" = u.id WHERE e."userId" = $1 ORDER BY e.date DESC`, [userId]),
-    // Fetch leaderboard data only in family group mode
+    // Fetch leaderboard data scoped to the selected month (resets monthly)
     activeTab === "family"
-      ? pool.query(`SELECT u.id, u.name, u."avatarUrl", COALESCE(SUM(e.amount), 0)::float as "totalSpent" FROM "User" u LEFT JOIN "Transaction" e ON u.id = e."userId" AND e.scope = 'GROUP' AND e.type = 'EXPENSE' GROUP BY u.id, u.name, u."avatarUrl" ORDER BY "totalSpent" DESC`)
+      ? pool.query(
+          `SELECT u.id, u.name, u."avatarUrl",
+                  COALESCE(SUM(e.amount), 0)::float as "totalSpent"
+           FROM "User" u
+           LEFT JOIN "Transaction" e
+             ON u.id = e."userId"
+             AND e.scope = 'GROUP'
+             AND e.type = 'EXPENSE'
+             AND EXTRACT(MONTH FROM e.date) = $1
+             AND EXTRACT(YEAR  FROM e.date) = $2
+           GROUP BY u.id, u.name, u."avatarUrl"
+           ORDER BY "totalSpent" DESC`,
+          [selectedMonth + 1, selectedYear]   // EXTRACT MONTH is 1-indexed
+        )
       : Promise.resolve({ rows: [] }),
     // Fetch all other users for the Send Money modal
     pool.query(`SELECT id, name FROM "User" WHERE id != $1`, [userId])
@@ -83,10 +105,7 @@ export default async function Home({
 
   const otherUsers = otherUsersResult.rows;
 
-  // Calculate Ledger Metrics
-  const now = new Date();
-  const selectedMonth = params.month ? parseInt(params.month as string, 10) : now.getMonth();
-  const selectedYear = params.year ? parseInt(params.year as string, 10) : now.getFullYear();
+  // selectedMonth / selectedYear already calculated above (before the DB queries)
 
   const isSelectedMonth = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -220,6 +239,8 @@ export default async function Home({
                   activeUser={activeUser}
                   transactions={monthlyExpenses}
                   currentUserId={userId}
+                  month={selectedMonth}
+                  year={selectedYear}
                 />
               </section>
             )}
