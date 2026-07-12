@@ -55,6 +55,11 @@ export default async function Home({
   const selectedMonth = params.month ? parseInt(params.month as string, 10) : now.getMonth();
   const selectedYear  = params.year  ? parseInt(params.year  as string, 10) : now.getFullYear();
 
+  // Date range for the selected month — computed in local (Nepal) time so it matches
+  // the JS `isSelectedMonth` filter used for the donut chart / category list.
+  const startOfMonth    = new Date(selectedYear, selectedMonth,     1); // local midnight
+  const startOfNextMonth = new Date(selectedYear, selectedMonth + 1, 1); // local midnight
+
   const [userResult, expResult, leaderboardResult, otherUsersResult] = await Promise.all([
     // Get user details
     pool.query(`SELECT name, "avatarUrl", "initialBalance", "balanceUpdatedAt", "pockets", "monthlyLimit" FROM "User" WHERE id = $1`, [userId]),
@@ -62,7 +67,7 @@ export default async function Home({
     activeTab === "family"
       ? pool.query(`SELECT e.id, e.amount, e.category, e.description, e.date, e."userId", e.type, u.name as "userName" FROM "Transaction" e LEFT JOIN "User" u ON e."userId" = u.id WHERE e.scope = 'GROUP' ORDER BY e.date DESC`)
       : pool.query(`SELECT e.id, e.amount, e.category, e.description, e.date, e."userId", e.type, u.name as "userName" FROM "Transaction" e LEFT JOIN "User" u ON e."userId" = u.id WHERE e."userId" = $1 ORDER BY e.date DESC`, [userId]),
-    // Fetch leaderboard data scoped to the selected month (resets monthly)
+    // Leaderboard: scoped to the selected month using a local-time date range
     activeTab === "family"
       ? pool.query(
           `SELECT u.id, u.name, u."avatarUrl",
@@ -72,11 +77,11 @@ export default async function Home({
              ON u.id = e."userId"
              AND e.scope = 'GROUP'
              AND e.type = 'EXPENSE'
-             AND EXTRACT(MONTH FROM e.date) = $1
-             AND EXTRACT(YEAR  FROM e.date) = $2
+             AND e.date >= $1
+             AND e.date <  $2
            GROUP BY u.id, u.name, u."avatarUrl"
            ORDER BY "totalSpent" DESC`,
-          [selectedMonth + 1, selectedYear]   // EXTRACT MONTH is 1-indexed
+          [startOfMonth.toISOString(), startOfNextMonth.toISOString()]
         )
       : Promise.resolve({ rows: [] }),
     // Fetch all other users for the Send Money modal

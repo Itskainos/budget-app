@@ -67,6 +67,7 @@ export function AddTransactionModal({
   const [selectedCategory, setSelectedCategory] = React.useState(activeCategories[0].name);
   const [open, setOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const dateInputRef = React.useRef<HTMLInputElement>(null);
 
   // Date picker state — defaults to today
   const [selectedDate, setSelectedDate] = React.useState(todayString());
@@ -216,31 +217,41 @@ export function AddTransactionModal({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-bold tracking-widest uppercase text-secondary ml-1">Date</label>
-              {!isToday && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedDate(todayString())}
-                  className="text-[10px] font-bold text-brand-teal uppercase tracking-widest hover:opacity-70 transition-opacity pr-1"
-                >
-                  Reset to Today
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {isToday ? (
+                  <span className="text-[10px] font-extrabold text-brand-teal bg-brand-teal/10 px-2.5 py-0.5 rounded-full">
+                    Today
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate(todayString())}
+                    className="text-[10px] font-bold text-brand-teal uppercase tracking-widest hover:opacity-70 transition-opacity"
+                  >
+                    Reset to Today
+                  </button>
+                )}
+              </div>
             </div>
             <div className="relative">
-              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary pointer-events-none" />
+              {/* Clickable calendar icon — triggers the native date picker */}
+              <button
+                type="button"
+                onClick={() => { try { dateInputRef.current?.showPicker(); } catch (_) { dateInputRef.current?.focus(); } }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-0.5 rounded hover:opacity-70 transition-opacity"
+                tabIndex={-1}
+              >
+                <Calendar className="w-4 h-4 text-brand-teal" />
+              </button>
               <input
+                ref={dateInputRef}
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 max={todayString()}
-                className="w-full bg-background border border-secondary/10 rounded-2xl pl-11 pr-4 py-4 text-primary font-semibold focus:outline-none focus:border-brand-teal transition-colors"
+                className="w-full bg-background border border-secondary/10 rounded-2xl pl-11 pr-4 py-4 text-primary font-semibold focus:outline-none focus:border-brand-teal transition-colors cursor-pointer"
                 style={{ colorScheme: 'dark' }}
               />
-              {isToday && (
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-extrabold text-brand-teal bg-brand-teal/10 px-2 py-0.5 rounded-full">
-                  Today
-                </span>
-              )}
             </div>
           </div>
 
